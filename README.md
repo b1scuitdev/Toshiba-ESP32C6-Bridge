@@ -10,7 +10,7 @@ The board is built around the **Seeed Studio XIAO ESP32-C6** and is intended to 
 
 ## 🔗 Project Links
 
-- 🧩 OSHWLab / EasyEDA Project: [Open Online](https://oshwlab.com/xqvc/toshiba-x-esp32c3-bridge)
+- 🧩 OSHWLab / EasyEDA Project: [Open Online](https://oshwlab.com/xqvc/project_wmbdnden)
 - 🗂️ Gerber Files: [Download Gerber](hardware/GERBER%20-%20Toshiba%20x%20ESP32C6%20UART%20Bridge%20v1.0%20-%20Rev%20A.zip)
 - 📄 Schematic PDF: [View Schematic](hardware/SCHEMATIC%20-%20Toshiba%20x%20ESP32C6%20UART%20Bridge%20v1.0%20-%20Rev%20A.pdf)
 - 📦 BOM: [Download BOM](hardware/BOM%20-%20ESP32C6%20UART%20Bridge%20v1.0%20-%20Rev%20A.xlsx)
