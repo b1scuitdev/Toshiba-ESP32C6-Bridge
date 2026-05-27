@@ -1,0 +1,19 @@
+# ESPHome / PlatformIO build files
+.esphome/
+**/.esphome/
+.pioenvs/
+.piolibdeps/
+**/.pioenvs/
+**/.piolibdeps/
+
+# ExifTool backup files
+*_original
+
+# Temporary / backup files
+*.tmp
+*.bak
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

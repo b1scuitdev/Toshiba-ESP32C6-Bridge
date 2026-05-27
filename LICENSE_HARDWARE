@@ -1,0 +1,23 @@
+CERN Open Hardware Licence Version 2 - Strongly Reciprocal (CERN-OHL-S-2.0)
+
+Copyright (c) 2026 Yiğit Alp Eltutan
+
+This license applies only to the hardware design files in this repository,
+including but not limited to schematic files, PCB layout files, Gerber files,
+BOM files, manufacturing files, assembly files, and related hardware
+documentation.
+
+This source describes Open Hardware and is licensed under the CERN Open Hardware
+Licence Version 2 - Strongly Reciprocal.
+
+You may copy, study, modify, manufacture, and distribute products based on this
+hardware documentation under the terms of the CERN-OHL-S-2.0 license.
+
+If you distribute modified versions of this hardware design, manufacture boards
+for distribution, sell products based on this design, or include this design in
+a larger hardware project, you must comply with the requirements of the
+CERN-OHL-S-2.0 license, including providing the corresponding source files and
+preserving the required notices.
+
+Full license text:
+https://ohwr.org/cern_ohl_s_v2.pdf

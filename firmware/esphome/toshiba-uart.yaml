@@ -1,0 +1,526 @@
+# Toshiba AC ESPHome configuration
+#
+# This setup uses the external Toshiba Suzumi ESPHome component:
+# https://github.com/pedobry/esphome_toshiba_suzumi
+#
+# Target board:
+# Seeed Studio XIAO ESP32-C6
+#
+# Notes:
+# - UART is used to communicate with the Toshiba AC indoor unit.
+# - GPIO3 and GPIO14 are used for the XIAO ESP32-C6 RF antenna switch.
+# - GPIO15 is used as the status LED.
+# - The AC Wi-Fi LED state is stored and restored after reboot.
+# - A simple Home Assistant off-timer is included, with 30-minute steps up to 12 hours.
+
+esphome:
+  name: toshiba-ac
+  friendly_name: Toshiba AC
+
+  on_boot:
+    priority: 800
+    then:
+      # XIAO ESP32-C6 RF switch setup:
+      # GPIO3 LOW  -> RF switch enabled
+      # GPIO14 LOW -> onboard ceramic antenna selected
+      - output.turn_on: rf_switch_power
+      - delay: 100ms
+      - output.turn_off: rf_antenna_select
+
+      - logger.log:
+          level: INFO
+          tag: boot
+          format: "Toshiba AC boot complete. RF switch set to onboard antenna."
+
+      # Restore the AC Wi-Fi LED state after boot.
+      # If no saved state exists, the LED defaults to ON.
+      - delay: 5s
+      - lambda: |-
+          auto* controller = static_cast<toshiba_suzumi::ToshibaClimateUart*>(id(toshiba_ac));
+          controller->set_wifi_led(id(wifi_led_enabled_state));
+
+          ESP_LOGI(
+            "wifi_led",
+            "Wi-Fi LED restored as: %s",
+            id(wifi_led_enabled_state) ? "ON" : "OFF"
+          );
+
+esp32:
+  board: seeed_xiao_esp32c6
+  variant: esp32c6
+  framework:
+    type: esp-idf
+
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+  level: DEBUG
+  baud_rate: 115200
+  logs:
+    wifi: WARN
+    api: WARN
+    ota: INFO
+    sensor: WARN
+    binary_sensor: INFO
+    climate: INFO
+    uart: WARN
+    toshiba_suzumi: DEBUG
+
+api:
+  reboot_timeout: 0s
+
+  on_client_connected:
+    then:
+      - logger.log:
+          level: INFO
+          tag: api
+          format: "Home Assistant API connected."
+
+  on_client_disconnected:
+    then:
+      - logger.log:
+          level: WARN
+          tag: api
+          format: "Home Assistant API disconnected."
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  fast_connect: true
+  power_save_mode: none
+  reboot_timeout: 0s
+
+  ap:
+    ssid: "Toshiba-AC-Fallback"
+    password: !secret fallback_ap_password
+    ap_timeout: 30s
+
+  on_connect:
+    then:
+      - logger.log:
+          level: INFO
+          tag: wifi
+          format: "Wi-Fi connected."
+
+  on_disconnect:
+    then:
+      - logger.log:
+          level: WARN
+          tag: wifi
+          format: "Wi-Fi disconnected."
+
+captive_portal:
+
+globals:
+  - id: wifi_led_enabled_state
+    type: bool
+    restore_value: true
+    initial_value: 'true'
+
+  - id: ac_off_timer_active
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
+  - id: ac_off_timer_hours_value
+    type: float
+    restore_value: false
+    initial_value: '0.0'
+
+  - id: ac_off_timer_end_millis
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: ac_off_timer_select_state
+    type: std::string
+    restore_value: false
+    initial_value: '"Off"'
+
+# RF antenna switch pins.
+#
+# GPIO3 is inverted, so output.turn_on pulls the pin LOW.
+# GPIO14 is not inverted, so output.turn_off pulls the pin LOW.
+output:
+  - platform: gpio
+    id: rf_switch_power
+    pin:
+      number: GPIO3
+      inverted: true
+
+  - platform: gpio
+    id: rf_antenna_select
+    pin:
+      number: GPIO14
+
+status_led:
+  pin:
+    number: GPIO15
+    inverted: true
+    ignore_strapping_warning: true
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/pedobry/esphome_toshiba_suzumi
+    components:
+      - toshiba_suzumi
+
+uart:
+  id: ac_uart
+
+  # ESP32 TX -> Toshiba RX
+  # ESP32 RX <- Toshiba TX
+  tx_pin: GPIO1
+  rx_pin: GPIO0
+
+  baud_rate: 9600
+  parity: EVEN
+
+climate:
+  - platform: toshiba_suzumi
+    name: "Toshiba AC"
+    id: toshiba_ac
+    uart_id: ac_uart
+
+    outdoor_temp:
+      name: "Toshiba AC Outdoor Temperature"
+      filters:
+        - filter_out: 127
+
+    power_select:
+      name: "Toshiba AC Power Level"
+
+    # You can enable horizontal swing here
+    #horizontal_swing: true
+
+    supported_presets:
+      - "Standard"
+      - "Hi POWER"
+      - "ECO"
+
+script:
+  - id: ac_off_timer_script
+    mode: restart
+    parameters:
+      delay_ms: int
+    then:
+      - lambda: |-
+          id(ac_off_timer_active) = true;
+          id(ac_off_timer_end_millis) = millis() + (uint32_t) delay_ms;
+
+          ESP_LOGI(
+            "off_timer",
+            "Off timer started. %.1f hour(s)",
+            id(ac_off_timer_hours_value)
+          );
+
+      - delay: !lambda |-
+          return delay_ms;
+
+      - if:
+          condition:
+            lambda: |-
+              if (!id(ac_off_timer_active)) {
+                return false;
+              }
+
+              if (id(toshiba_ac).mode == climate::CLIMATE_MODE_OFF) {
+                return false;
+              }
+
+              int32_t remaining_ms = (int32_t) (id(ac_off_timer_end_millis) - millis());
+              return remaining_ms <= 1000;
+          then:
+            - lambda: |-
+                auto call = id(toshiba_ac).make_call();
+                call.set_mode(climate::CLIMATE_MODE_OFF);
+                call.perform();
+
+                id(ac_off_timer_active) = false;
+                id(ac_off_timer_hours_value) = 0.0f;
+                id(ac_off_timer_end_millis) = 0;
+                id(ac_off_timer_select_state) = "Off";
+
+                id(ac_off_timer_select).publish_state("Off");
+                id(ac_off_timer_remaining).publish_state("Off");
+
+                ESP_LOGI("off_timer", "Timer finished. AC turned OFF.");
+
+interval:
+  - interval: 5s
+    then:
+      - if:
+          condition:
+            lambda: |-
+              return id(ac_off_timer_active) &&
+                     id(toshiba_ac).mode == climate::CLIMATE_MODE_OFF;
+          then:
+            - script.stop: ac_off_timer_script
+            - lambda: |-
+                id(ac_off_timer_active) = false;
+                id(ac_off_timer_hours_value) = 0.0f;
+                id(ac_off_timer_end_millis) = 0;
+                id(ac_off_timer_select_state) = "Off";
+
+                id(ac_off_timer_select).publish_state("Off");
+                id(ac_off_timer_remaining).publish_state("Off");
+
+                ESP_LOGI("off_timer", "AC was manually turned OFF. Off timer cancelled.");
+
+select:
+  - platform: template
+    name: "Toshiba AC Off Timer"
+    id: ac_off_timer_select
+    icon: "mdi:timer-off"
+
+    lambda: |-
+      return id(ac_off_timer_select_state);
+
+    options:
+      - "Off"
+      - "30 min"
+      - "1 hour"
+      - "1.5 hours"
+      - "2 hours"
+      - "2.5 hours"
+      - "3 hours"
+      - "3.5 hours"
+      - "4 hours"
+      - "4.5 hours"
+      - "5 hours"
+      - "5.5 hours"
+      - "6 hours"
+      - "6.5 hours"
+      - "7 hours"
+      - "7.5 hours"
+      - "8 hours"
+      - "8.5 hours"
+      - "9 hours"
+      - "9.5 hours"
+      - "10 hours"
+      - "10.5 hours"
+      - "11 hours"
+      - "11.5 hours"
+      - "12 hours"
+
+    set_action:
+      - lambda: |-
+          float hours = 0.0f;
+
+          if (x == "30 min") hours = 0.5f;
+          else if (x == "1 hour") hours = 1.0f;
+          else if (x == "1.5 hours") hours = 1.5f;
+          else if (x == "2 hours") hours = 2.0f;
+          else if (x == "2.5 hours") hours = 2.5f;
+          else if (x == "3 hours") hours = 3.0f;
+          else if (x == "3.5 hours") hours = 3.5f;
+          else if (x == "4 hours") hours = 4.0f;
+          else if (x == "4.5 hours") hours = 4.5f;
+          else if (x == "5 hours") hours = 5.0f;
+          else if (x == "5.5 hours") hours = 5.5f;
+          else if (x == "6 hours") hours = 6.0f;
+          else if (x == "6.5 hours") hours = 6.5f;
+          else if (x == "7 hours") hours = 7.0f;
+          else if (x == "7.5 hours") hours = 7.5f;
+          else if (x == "8 hours") hours = 8.0f;
+          else if (x == "8.5 hours") hours = 8.5f;
+          else if (x == "9 hours") hours = 9.0f;
+          else if (x == "9.5 hours") hours = 9.5f;
+          else if (x == "10 hours") hours = 10.0f;
+          else if (x == "10.5 hours") hours = 10.5f;
+          else if (x == "11 hours") hours = 11.0f;
+          else if (x == "11.5 hours") hours = 11.5f;
+          else if (x == "12 hours") hours = 12.0f;
+
+          id(ac_off_timer_hours_value) = hours;
+
+      - if:
+          condition:
+            lambda: |-
+              return id(ac_off_timer_hours_value) <= 0.01f;
+          then:
+            - script.stop: ac_off_timer_script
+            - lambda: |-
+                id(ac_off_timer_active) = false;
+                id(ac_off_timer_hours_value) = 0.0f;
+                id(ac_off_timer_end_millis) = 0;
+                id(ac_off_timer_select_state) = "Off";
+
+                id(ac_off_timer_select).publish_state("Off");
+                id(ac_off_timer_remaining).publish_state("Off");
+
+                ESP_LOGI("off_timer", "Off timer cancelled from select.");
+
+          else:
+            - if:
+                condition:
+                  lambda: |-
+                    return id(toshiba_ac).mode == climate::CLIMATE_MODE_OFF;
+                then:
+                  - script.stop: ac_off_timer_script
+                  - lambda: |-
+                      id(ac_off_timer_active) = false;
+                      id(ac_off_timer_hours_value) = 0.0f;
+                      id(ac_off_timer_end_millis) = 0;
+                      id(ac_off_timer_select_state) = "Off";
+
+                      id(ac_off_timer_select).publish_state("Off");
+                      id(ac_off_timer_remaining).publish_state("Off");
+
+                      ESP_LOGW("off_timer", "Timer was not started because the AC is already OFF.");
+
+                else:
+                  - lambda: |-
+                      id(ac_off_timer_select_state) = x;
+                      id(ac_off_timer_select).publish_state(x);
+
+                      float hours_f = id(ac_off_timer_hours_value);
+                      uint32_t total_minutes = (uint32_t) (hours_f * 60.0f + 0.5f);
+
+                      uint32_t hours = total_minutes / 60;
+                      uint32_t minutes = total_minutes % 60;
+
+                      if (hours == 0) {
+                        id(ac_off_timer_remaining).publish_state(
+                          std::to_string(minutes) + " min"
+                        );
+                      } else if (minutes == 0) {
+                        if (hours == 1) {
+                          id(ac_off_timer_remaining).publish_state("1 hour");
+                        } else {
+                          id(ac_off_timer_remaining).publish_state(
+                            std::to_string(hours) + " hours"
+                          );
+                        }
+                      } else {
+                        id(ac_off_timer_remaining).publish_state(
+                          std::to_string(hours) + " hours " + std::to_string(minutes) + " min"
+                        );
+                      }
+
+                  - script.execute:
+                      id: ac_off_timer_script
+                      delay_ms: !lambda |-
+                        return (int) (id(ac_off_timer_hours_value) * 3600000.0f);
+
+binary_sensor:
+  - platform: status
+    name: "Toshiba AC ESP Status"
+
+switch:
+  - platform: template
+    name: "Toshiba AC Wi-Fi LED"
+    id: toshiba_ac_wifi_led
+    icon: "mdi:led-on"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+    lambda: |-
+      return id(wifi_led_enabled_state);
+
+    turn_on_action:
+      - lambda: |-
+          id(wifi_led_enabled_state) = true;
+
+          auto* controller = static_cast<toshiba_suzumi::ToshibaClimateUart*>(id(toshiba_ac));
+          controller->set_wifi_led(true);
+
+          ESP_LOGI("wifi_led", "Wi-Fi LED switched ON from Home Assistant");
+
+    turn_off_action:
+      - lambda: |-
+          id(wifi_led_enabled_state) = false;
+
+          auto* controller = static_cast<toshiba_suzumi::ToshibaClimateUart*>(id(toshiba_ac));
+          controller->set_wifi_led(false);
+
+          ESP_LOGI("wifi_led", "Wi-Fi LED switched OFF from Home Assistant");
+
+sensor:
+  - platform: wifi_signal
+    name: "Toshiba AC Wi-Fi Signal"
+    id: wifi_rssi
+    update_interval: 5s
+
+  - platform: uptime
+    name: "Toshiba AC Uptime"
+    id: esp_uptime
+    update_interval: 10s
+
+text_sensor:
+  - platform: template
+    name: "Toshiba AC Off Timer Remaining"
+    id: ac_off_timer_remaining
+    icon: "mdi:timer-sand"
+    update_interval: 30s
+    lambda: |-
+      if (!id(ac_off_timer_active)) {
+        return std::string("Off");
+      }
+
+      if (id(toshiba_ac).mode == climate::CLIMATE_MODE_OFF) {
+        return std::string("Off");
+      }
+
+      int32_t remaining_ms = (int32_t) (id(ac_off_timer_end_millis) - millis());
+
+      if (remaining_ms <= 0) {
+        return std::string("Turning off...");
+      }
+
+      uint32_t total_minutes = ((uint32_t) remaining_ms + 59999) / 60000;
+
+      if (total_minutes <= 0) {
+        return std::string("Turning off...");
+      }
+
+      uint32_t hours = total_minutes / 60;
+      uint32_t minutes = total_minutes % 60;
+
+      if (hours == 0) {
+        return std::to_string(minutes) + " min";
+      }
+
+      if (minutes == 0) {
+        if (hours == 1) {
+          return std::string("1 hour");
+        }
+
+        return std::to_string(hours) + " hours";
+      }
+
+      return std::to_string(hours) + " hours " + std::to_string(minutes) + " min";
+
+  - platform: wifi_info
+    ip_address:
+      name: "Toshiba AC IP Address"
+    ssid:
+      name: "Toshiba AC Connected SSID"
+    bssid:
+      name: "Toshiba AC Connected BSSID"
+    mac_address:
+      name: "Toshiba AC MAC Address"
+
+button:
+  - platform: restart
+    name: "Toshiba AC Restart"
+
+  - platform: template
+    name: "Toshiba AC Cancel Off Timer"
+    icon: "mdi:timer-remove"
+    on_press:
+      - script.stop: ac_off_timer_script
+      - lambda: |-
+          id(ac_off_timer_active) = false;
+          id(ac_off_timer_hours_value) = 0.0f;
+          id(ac_off_timer_end_millis) = 0;
+          id(ac_off_timer_select_state) = "Off";
+
+          id(ac_off_timer_select).publish_state("Off");
+          id(ac_off_timer_remaining).publish_state("Off");
+
+          ESP_LOGI("off_timer", "Off timer cancelled from button.");
