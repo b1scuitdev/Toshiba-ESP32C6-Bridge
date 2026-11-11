@@ -75,6 +75,19 @@ This board has only been tested with a **Toshiba Seiya** air conditioner.
 It will likely work with other Toshiba air conditioners that use the same internal **CN22 UART** interface, but this has not been verified.  
 Always check your own unit's connector, pinout, and documentation before connecting the board.
 
+### Units with a 4-pin CN22
+
+Also tested on a **Toshiba Mirai RAS-13BKV-E** (2017/2018, main board WP-026). Units of that generation have a **4-pin CN22** and no extension cable; Toshiba's own adapter cable for them (43T60480) connects CN22 pins 1-4 straight to the adapter's pins 1-4. The board works with a 4-wire cable wired 1:1 to X1 pins 1-4, X1 pin 5 left unconnected:
+
+| CN22 | Function | X1 |
+|---|---|---|
+| 1 | AC RX | 1 |
+| 2 | GND | 2 |
+| 3 | +5V | 3 |
+| 4 | AC TX | 4 |
+
+On that board, +5V and GND are the two middle pins (+5V nearer the board edge), so pin 4 is the outermost pin at the edge. Confirm GND and +5V with a multimeter, unit unplugged, before connecting: swapping those two is the mistake that can cause damage.
+
 ## 🖼️ Images
 
 ### PCB
