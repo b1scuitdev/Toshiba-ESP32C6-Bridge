@@ -86,7 +86,9 @@ Also tested on a **Toshiba Mirai RAS-13BKV-E** (2017/2018, main board WP-026). U
 | 3 | +5V | 3 |
 | 4 | AC TX | 4 |
 
-On that board, +5V and GND are the two middle pins (+5V nearer the board edge), so pin 4 is the outermost pin at the edge. Confirm GND and +5V with a multimeter, unit unplugged, before connecting: swapping those two is the mistake that can cause damage.
+On that board, +5V and GND are the two middle pins (+5V nearer the board edge), so pin 4 is the outermost pin at the edge.
+
+![CN22 on a WP-026 board](images/wp026-cn22-pinout.jpg) Confirm GND and +5V with a multimeter, unit unplugged, before connecting: swapping those two is the mistake that can cause damage.
 
 ## 🖼️ Images
 
