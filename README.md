@@ -77,7 +77,8 @@ Always check your own unit’s connector, pinout, and documentation before conne
 
 ### Units with a 4-pin CN22
 
-Also tested by @ksorokin on a **Toshiba Mirai RAS-13BKV-E** (2017/2018, main board WP-026). Units of that generation have a **4-pin CN22** and no extension cable; Toshiba's own adapter cable for them (43T60480) connects CN22 pins 1-4 straight to the adapter's pins 1-4. The board works with a 4-wire cable wired 1:1 to X1 pins 1-4, X1 pin 5 left unconnected:
+Also tested by @ksorokin on a **Toshiba Mirai RAS-13BKV-E** (2017/2018, main board WP-026). 
+Units of that generation have a **4-pin CN22** and no extension cable; Toshiba's own adapter cable for them (43T60480) connects CN22 pins 1-4 straight to the adapter's pins 1-4. The board works with a 4-wire cable wired 1:1 to X1 pins 1-4, X1 pin 5 left unconnected:
 
 | CN22 | Function | X1 |
 |---|---|---|
