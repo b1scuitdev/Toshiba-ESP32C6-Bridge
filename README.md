@@ -70,14 +70,14 @@ Do not commit real Wi-Fi credentials if you fork or modify this repository; untr
 
 ## 🧪 Compatibility
 
-This board has only been tested with a **Toshiba Seiya** air conditioner.
+This board has been successfully tested with a Toshiba Seiya and a Toshiba Mirai RAS-13BKV-E (see the 4-pin CN22 section below).
 
-It will likely work with other Toshiba air conditioners that use the same internal **CN22 UART** interface, but this has not been verified.  
-Always check your own unit's connector, pinout, and documentation before connecting the board.
+Other Toshiba air conditioners using the same CN22 UART interface may also be compatible, but have not been verified.
+Always check your own unit’s connector, pinout, and documentation before connecting the board.
 
 ### Units with a 4-pin CN22
 
-Also tested on a **Toshiba Mirai RAS-13BKV-E** (2017/2018, main board WP-026). Units of that generation have a **4-pin CN22** and no extension cable; Toshiba's own adapter cable for them (43T60480) connects CN22 pins 1-4 straight to the adapter's pins 1-4. The board works with a 4-wire cable wired 1:1 to X1 pins 1-4, X1 pin 5 left unconnected:
+Also tested by @ksorokin on a **Toshiba Mirai RAS-13BKV-E** (2017/2018, main board WP-026). Units of that generation have a **4-pin CN22** and no extension cable; Toshiba's own adapter cable for them (43T60480) connects CN22 pins 1-4 straight to the adapter's pins 1-4. The board works with a 4-wire cable wired 1:1 to X1 pins 1-4, X1 pin 5 left unconnected:
 
 | CN22 | Function | X1 |
 |---|---|---|
@@ -88,7 +88,9 @@ Also tested on a **Toshiba Mirai RAS-13BKV-E** (2017/2018, main board WP-026). U
 
 On that board, +5V and GND are the two middle pins (+5V nearer the board edge), so pin 4 is the outermost pin at the edge.
 
-![CN22 on a WP-026 board](images/wp026-cn22-pinout.jpg) Confirm GND and +5V with a multimeter, unit unplugged, before connecting: swapping those two is the mistake that can cause damage.
+![CN22 on a WP-026 board](images/wp026-cn22-pinout.jpg) 
+
+Confirm GND and +5V with a multimeter, unit unplugged, before connecting: swapping those two is the mistake that can cause damage.
 
 ## 🖼️ Images
 
